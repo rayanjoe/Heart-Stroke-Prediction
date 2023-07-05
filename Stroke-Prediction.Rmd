@@ -1,0 +1,341 @@
+---
+title: "Final_project"
+author: "Rayan Joseph B"
+date: "2022-11-08"
+output: html_document
+---
+
+![](https://www.hamiltonhealthsciences.ca/wp-content/uploads/2019/06/stroke-1024x683.jpg)
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(lattice)
+library(caret)
+library(skimr)
+library(GGally)
+library(caret)
+library(e1071)
+library(rpart)
+library(rpart.plot)
+library(cluster)
+```
+
+1.DATA GATHERING AND INTEGRATION
+
+```{r}
+brain <- read.csv("/Users/cdmstudent/Downloads/brain_stroke.csv")
+#tdf <- tdf[,-c(21,22)]
+stroke_na <- na.omit(brain)#removing NA's from the data table.
+sapply(stroke_na, class)
+```
+
+1.1 Data Formation and Clearing
+
+Before the data exploration of the data frame we have to convert it to the
+
+```{r}
+#Changing the numerical values to character
+stroke_na$stroke<- factor(stroke_na$stroke, 
+                          levels = c(0,1), labels = c("No", "Yes"))
+stroke_na$hypertension<- factor(stroke_na$hypertension, 
+                                levels = c(0,1), labels = c("No", "Yes"))
+stroke_na$heart_disease<- factor(stroke_na$heart_disease, 
+                                 levels = c(0,1), labels = c("No", "Yes"))
+#factoring all the vectors in the data table.
+stroke_na$ever_married<-as.factor(stroke_na$ever_married)
+stroke_na$gender<-as.factor(stroke_na$gender)
+stroke_na$work_type<-as.factor(stroke_na$work_type)
+stroke_na$Residence_type<-as.factor(stroke_na$Residence_type)
+stroke_na$smoking_status<-as.factor(stroke_na$smoking_status)
+stroke_na$bmi<-as.numeric(stroke_na$bmi)
+sapply(stroke_na, class)
+```
+
+```{r}
+df_ex <- skim(stroke_na)
+df_ex
+```
+
+1.2 Data Understanding Summary of the dataset
+
+```{r}
+summary(stroke_na)
+```
+
+Understandings: 1.Female's is more than men's count in the data frame. 2.The predictors STROKE has less bias data points. 3. Age attribute distributed throughout all age frame.
+
+Attributes of the data table.
+
+1.  id: A unique identifier
+
+2.  gender: "Male", "Female" or "Other"
+
+3.  age: age of the patient
+
+4.  hypertension: 0 if the patient doesn't have any kind of hypertension, 1 if the patient has hypertension
+
+5.  heart_disease: 0 if the patient doesn't have any kind of past history in heart diseases, 1 if the patient has any kind of heart disease
+
+6.  ever_married: "No" or "Yes"
+
+7.  work_type: "children", "Govt_jov", "Never_worked", "Private" or "Self-employed" Residence_type: "Rural" or "Urban"
+
+8.  avg_glucose_level (average glucose level in blood): "Numeric Values"
+
+9.  bmi(Body Mass Index): "Numeric Values"
+
+10. smoking_status: "formerly smoked", "never smoked", "smokes" or "Unknown"
+
+11. stroke: "1" is, if a patient suffered with a stroke or "0" if not
+
+2.DATA EXPLORATION.
+
+Overview of the Stroke data set as whole in a exploratory view.
+
+```{r}
+ggpairs(stroke_na, title="Exploratory study of the Stroke Dataset",ggplot2::aes(colour=hypertension)) 
+```
+
+Understanding: 
+1. Exploratory tudy of the graph gives overview of the data structure.
+
+
+E
+2.2 Comparing the Stroke and AGE.
+
+```{r}
+ggplot(stroke_na, aes(stroke, age)) +
+  geom_boxplot(aes(fill = stroke), alpha = 0.4, varwidth = T, notch = T) +
+  geom_violin(aes(fill = stroke), alpha = 0.7) +
+  scale_fill_brewer(palette = "Set1", direction = -1)
+```
+
+Understandings:
+$1$. As expected the old age people are getting more stroke than the young people, but the some babies and young teenage people are getting stroke from above visualization.
+
+
+
+2.3 Compairing the BMI and Stroke.
+
+```{r}
+ggplot(stroke_na, aes(stroke, bmi)) + geom_boxplot(aes(fill = stroke), alpha = 0.4, varwidth = T, notch = T) +
+geom_violin(aes(fill = stroke), alpha = 0.7) + scale_fill_brewer(palette = "Set1", direction = 1)
+```
+
+Understanding: 
+BMI and stroke results are surprising because stroke attacked people are between the 25 to 35 bmi, in contrast they are obese but not extreme obese.
+
+
+
+2.3 Comparing Stroke vs Gulcose
+
+```{r}
+ggplot(stroke_na, aes(stroke, avg_glucose_level)) + geom_boxplot(aes(fill = stroke), alpha = 0.7, varwidth = T, notch = T) + geom_violin(aes(fill = stroke), alpha = 0.4) + scale_fill_brewer(palette = "Set1", direction = 1)
+```
+
+Understanding. Mostly stroke attacking case tends to have higher glucose level.
+
+
+
+2.4 Comparing the Stroke vs Age + Gender
+
+```{r}
+ggplot(stroke_na, aes(stroke, age)) + 
+  geom_violin(alpha=0.9) +
+  geom_jitter(alpha=0.7, size=0.3, width = 0.15, height = 0.1, aes(color = gender)) + 
+  geom_boxplot(alpha = 0.2) +
+  scale_color_brewer(palette = "Set2", direction = -1)
+```
+
+Understanding Age didn't create any type of unique clusters in the stroke and age graph.
+
+
+
+2.5 Comparing the Age and BMI vs Stroke
+
+```{r}
+facet_names <- c("No" = "No Stroke", "Yes" = "Yes Stroke")
+ggplot(stroke_na, aes(age, bmi)) + geom_point(color = "tomato", alpha = 0.8, size = 0.5) + facet_grid(rows = vars(stroke), labeller = as_labeller(facet_names)) + guides()
+```
+
+Understanding: As the findings here says that the old age people who has BMI of above 20 to below 40 are getting more stoke problem.
+
+
+
+2.6 Comparing the Glucose vs Age + Smoking
+
+```{r}
+ggplot(stroke_na, aes(age, avg_glucose_level))+geom_point(aes(color = smoking_status), alpha = 0.9,size = 0.5) + facet_grid(rows = vars(stroke), labeller = as_labeller(facet_names)) + guides()
+```
+
+Understandings: Glucose level of the stroke person are have high age with the smoking people has more probability of getting the Stroke.
+
+
+
+2.7 Comparing the Glucose Level vs BMI
+
+```{r}
+ggplot(stroke_na, aes(avg_glucose_level, bmi)) + geom_point(color = "tomato", alpha = 0.8, size = 0.5) + facet_grid(rows = vars(stroke), labeller = as_labeller(facet_names)) + guides()
+```
+
+Understanding:
+
+2.8 Comparing the Age vs Smoking.
+
+```{r}
+ggplot(stroke_na, aes(smoking_status, age)) +
+  geom_boxplot(aes(fill = stroke), alpha = 0.5, varwidth = T, notch = T) +
+  scale_fill_brewer(palette = "Set1", direction = -1) +
+  xlab("")
+```
+
+Understandings: 
+More unknown values found in the 8\~40+ but the mean values of the data is in the 21 So, most children are not a smokers.
+
+2.9 Comparing the STROKE VS GENDER
+```{r}
+
+```
+
+Conclusion.
+
+*The Stoke of the dataset says is affected by
+
+
+
+
+
+3. DATA PREPROCESSING
+
+My data has the categorical variable. So, am using the dummy vars to convert categorical data to numerical for the SVM.
+
+Performing Dummy Variable of the data.
+```{r}
+dummydata <- dummyVars(stroke ~ ., data=stroke_na)
+dummies_data<- as.data.frame(predict(dummydata, newdata = stroke_na))
+dummies_data$stroke <- stroke_na$stroke
+head(dummies_data)
+```
+
+
+4. DATA CLASSIFICATION
+
+The processed data has target variable as a "Stroke" So, plan to implement SVM classification method.
+
+
+CLASSIFIER-1:
+Splitting the data into train_set and test_set for SVM.
+```{r}
+set.seed(123)
+index = createDataPartition(dummies_data$stroke , p=0.7, list=FALSE)
+train_set = dummies_data[index,]
+test_set = dummies_data[-index,]
+```
+
+
+Using the Cross Validation method for Classification.
+```{r}
+train_control = trainControl(method = "cv", number = 10)
+svm_grid <- train(stroke ~., data = dummies_data, method = "svmLinear", trControl = train_control)
+svm_grid
+```
+
+CLASSIFIER-2:
+Using the classifier of Dicision tree to classify the data from the Stroke dataset
+```{r}
+library(rattle)
+#rattle()
+install.packages("RGtk2")
+library(rpart)
+hypers = rpart.control(minsplit =  4, maxdepth = 4, minbucket = 10)
+train_set_df <- data.frame(train_set)
+tree <- train(stroke ~ .,control = hypers, data = train_set_df , method = "rpart1SE", trControl = train_control)
+tree
+```
+
+```{r}
+#colnames(df)[2] <- "new_col2"
+dummies_data_df <- data.frame(dummies_data)
+pred_tree <- predict(tree, dummies_data_df)
+confusionMatrix(dummies_data_df$stroke, pred_tree)
+```
+
+4. DATA EVALUATION.
+
+Plotting the ROC values of the given data table.
+
+1. Predicition using the test set for ROC
+2. Plotting the confusion matrix
+```{r}
+pred_test<-predict(svm_grid,test_set)
+confu_mat<-confusionMatrix(as.factor(test_set$stroke), pred_test)
+confu_mat
+```
+Calculating the precision and recall.
+```{r}
+confu_mat$byClass["Precision"]
+
+confu_mat$byClass["Recall"]
+```
+
+PLotting the ROC curve.
+```{r}
+library(pROC)
+roc_svm<-roc(response=test_set$stroke,predictor=as.numeric(pred_test))
+plot(roc_svm, print.auc=TRUE)
+```
+
+
+
+5.Clustering.
+
+
+The data have to be done in Unsupervised learning so have to remove the target variable.
+```{r}
+clust_dat<-dummies_data_df %>% select(-c(stroke))
+```
+
+
+```{r}
+library(factoextra)
+set.seed(13)
+
+preprocess<-preProcess(clust_dat,method=c("center","scale"))
+pred<-predict(preprocess,clust_dat)
+```
+
+# finding optimal number of clusters for we are using WSS and SILHOUTTE method
+
+```{r}
+fviz_nbclust(clust_dat, kmeans, method = "wss")
+```
+
+K means clustering wiht the Silhouette method
+```{r}
+fviz_nbclust(clust_dat, kmeans, method = "silhouette")
+```
+
+
+
+```{r}
+library(cluster)
+gap_stat <- clusGap(clust_dat,
+                    FUN = kmeans,
+                    nstart = 25,
+                    K.max = 10,
+                    B = 50)
+
+# plot number of clusters vs. gap statistic
+
+fviz_gap_stat(gap_stat)
+```
+
+
+
+
+
+
+
+
+
